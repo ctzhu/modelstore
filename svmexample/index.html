@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<script>
+  MathJax.Hub.Config({
+                      tex2jax: {inlineMath: [['$', '$'], ['\\(','\\)']]},
+                      TeX: { equationNumbers: {autoNumber: "AMS"} },
+                      "HTML-CSS": { showMathMenu: false,
+                                    scale: 90 }
+
+                     });
+</script>
+<link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.4.2/pure-min.css">
+<style>
+
+@import url(http://fonts.googleapis.com/css?family=PT+Serif|PT+Serif:b|PT+Serif:i|PT+Sans|PT+Sans:b);
+@import url(http://fonts.googleapis.com/css?family=Lato);
+html {
+   min-width: 1040px;
+}
+
+body {
+   background: #fcfcfa;
+   color: #333;
+   font-family: "PT Serif", serif;
+   /*margin: 0 1em 4em auto;*/
+   position: relative;
+   width: 960px;
+   left: 13em;
+}
+
+h1, h2, h3, h4 { font-family: "Lato", "PT Serif", serif; color: #000; text-rendering: optimizeLegibility; }
+
+h1 {
+  font-size: 64px;
+  line-height: 73px;
+  font-weight: 900;
+  margin-top: 0.67em;
+  margin-right: 0;
+  margin-bottom: 0;
+  margin-left: 0;
+}
+
+h2 {
+   margin-top: 2em;
+}
+
+subtitle {
+   display:block;
+   font-family: "PT Serif", serif;
+   font-size: 32px;
+   font-style: italic;
+   font-weight: 100;
+}
+
+p {
+  line-height: 150%;
+  width: 720px;
+}
+
+a {
+  color: steelblue;
+  cursor: auto;
+}
+
+a:not(:hover) {
+   text-decoration: none;
+}
+
+pre {
+   border-left: solid 2px #ccc;
+   padding-left: 18px;
+   margin: 2em 0 2em -20px;
+}
+
+aside {
+   font-size: small;
+   right: 0;
+   position: absolute;
+   width: 180px;
+}
+
+#nav {
+        left: 5px;
+        font-family: "Lato", serif;
+        font-weight: 700;
+        list-style: none;
+        margin: 0;
+        position: fixed;
+        top: 10px;
+        box-sizing: border-box;
+}
+
+
+#nav li {
+        margin-bottom: 0px;
+}
+
+#nav a {
+        color: #333;
+        display: block;
+        font-size: 14px;
+        border-left: 3px solid #fcfcfa;
+        padding: 5px 10px;
+        text-decoration: none;
+}
+
+#nav a:hover {
+   border-left: 3px solid steelblue;
+}
+
+#nav .current a {
+   border-left: 3px solid steelblue;
+}
+
+.typea {
+  fill: red;
+  color: red;
+}
+
+.typeb {
+  fill: green;
+  color: green;
+}
+
+.misclassified {
+ stroke: black;
+ stroke-width: 2;
+}
+
+
+</style>
+<body>
+  <ul id="nav">
+    <li class="current"><a href="#intro">Intro</a></li>
+    <li><a href="#problem">Problem</a></li>
+    <li><a href="#model">Model</a></li>
+    <li><a href="#implementation">Implementation</a></li>
+    <li><a href="#demo">Live Demo</a></li>
+  </ul>
+  <div id="container">
+    <div class="section" id="intro">
+      <h1>Support Vector Machines</h1>
+        <subtitle>with quadratic programming and Gurobi</subtitle>
+    </div>
+
+    <div class="section" id="problem">
+      <h2><a href="#problem" name="problem">Problem Description</a></h2>
+      Problem description goes here
+    </div>
+    <div class="section" id="model">
+      <h2><a href="#model" name="model">Mathematical Model</a></h2>
+
+      <p>Model description goes here.</p>
+      <p> Suppose we are given training data $\{x_i\}$, $i=1,...,N$ and $\{y_i\}$, $i=1,...,M$, and
+          we wish to compute a linear classifier $f(x) = a^T x - \beta$ and
+       \[
+         f(x_i) > 0, \quad i=1, \ldots, N \quad \text{and} \quad
+          f(y_i) < 0, \quad i=1, \ldots, M
+       \]
+
+      <p>Then the following model can be solved to classify points
+      \[
+      \begin{array}{ll}
+      \text{minimize} & \| a \|_2^2 + \gamma (e^T u + e^T v) \\
+      \text{subject to} & a^T x_i - \beta \ge 1 - u_i, \quad i=1, \ldots, N \\
+                        & a^T y_i - \beta \le - (1 - v_i), \quad i=1, \ldots, M \\
+                        & u \ge 0, v \ge 0, a\ \text{free}, \beta\ \text{free}
+      \end{array}
+      \]
+      </p>
+    </div>
+    <div class="section" id="implementation">
+      <h2><a href="#implementation" name="implementation">Implementation</a></h2>
+      <p>Below is the full implementation of the model (and the associated data) in
+        Gurobi's Python interface:
+      </p>
+      <pre>
+    m = Model()
+
+    a = [ m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, name="a0"),
+          m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, name="a1") ]
+    beta = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, name="beta")
+
+    u = []
+    N = len(x)
+    for i in xrange(N):
+        u.append(m.addVar(name=("u%d" % i)))
+
+    v = []
+    M = len(y)
+    for i in xrange(M):
+        v.append(m.addVar(name=("v%d" % i)))
+
+    m.update()
+
+    m.setObjective(a[0]*a[0] + a[1]*a[1] + gamma*(quicksum(u) + quicksum(v)))
+
+    for i in xrange(N):
+        xi = x[i]
+        m.addConstr(a[0]*xi[0] + a[1]*xi[1] - beta >= 1 - u[i], name=("x%d" % i))
+
+    for i in xrange(M):
+        yi = y[i]
+        m.addConstr(a[0]*yi[0] + a[1]*yi[1] - beta <= -(1 - v[i]), name=("y%d" % i))
+
+    m.optimize()
+      </pre>
+    </div>
+    <div class="section" id="demo">
+      <h2><a href="#demo" name="demo">Live Demo</a></h2>
+
+      <div id="demoarea">
+      </div>
+      <button class="pure-button" onclick="compute()">Compute Classification</button>
+      <button class = "pure-button" onclick="change()">Change Point Type <span id="point_color" class="typea">&#9679;</span></button>
+    </div>
+
+    <div style="min-height:100px"></div>
+<!--[if gt IE 8]><!--><script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script><!--<![endif]-->
+<script src="http://davist11.github.io/jQuery-One-Page-Nav/jquery.nav.js"></script>
+<script>
+  $(document).ready(function() {
+  console.log('calling onePageNav');
+  $('#nav').onePageNav();
+  });
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<script>
+
+var width = 600,
+    height = 500;
+
+var svg = d3.select("#demoarea").append("svg")
+    .attr("width", width)
+    .attr("height", height)
+    .on("mousedown", mousedown);
+
+var points = [];
+var type = 1;
+
+function mousedown() {
+  var point = d3.mouse(this),
+      node = {x: point[0], y: point[1], type: type},
+      n = points.push(node);
+
+  restart();
+}
+
+
+function restart() {
+   svg.selectAll("circle")
+      .data(points)
+      .enter().append("svg:circle")
+      .attr("cx", function (d) { return d.x; })
+      .attr("cy", function (d) { return d.y; })
+      .attr("r", 4.5)
+      .attr("class", function (d) {
+                        var type;
+                        if (d.type === 1) {
+                           type = "typea";
+                        } else {
+                           type = "typeb";
+                        }
+                        return d3.select(this).attr("class") + " " + type;
+                    });
+}
+
+function change () {
+  type = type * -1;
+  d3.select("#point_color").attr("class", function(d) {
+                                           var cls_str;
+                                           if (type === 1) {
+                                             cls_str = "typea";
+                                           } else {
+                                             cls_str = "typeb";
+                                           }
+                                           return cls_str;
+                                          });
+}
+
+function compute() {
+  var x = [];
+  var y = [];
+  for (var i = 0; i < points.length; i++) {
+     if (points[i].type === 1) {
+        x.push([points[i].x, points[i].y]);
+     } else {
+        y.push([points[i].x, points[i].y]);
+     }
+  }
+  console.log('x', x);
+  console.log('y', y);
+
+  d3.json('/svmexample')
+    .header('Content-Type', 'application/json')
+    .post(JSON.stringify({'x': x,
+                          'y': y,
+                          'gamma': 0.1 }), serverResponse);
+}
+
+function serverResponse(error, data) {
+   console.log('serverResponse');
+   console.log('data', data);
+   if (!error) {
+      if ('a' in data && 'beta' in data) {
+        var a = data['a'];
+        var beta = data['beta'];
+        var slope = -a[0]/a[1];
+        var intercept = beta/a[1];
+        var aNorm = Math.sqrt(a[0]*a[0] + a[1]*a[1]);
+        // cos = (y2 - y1)/(sqrt((x2-x1)^2 + (y2 -y1)^2))
+        var angleRad = (width*slope)/Math.sqrt(width*width + (width*slope)*(width*slope));
+        var angle = 180 - Math.acos(angleRad)*180/Math.PI;
+
+        console.log('slope', slope);
+        console.log('intercept', intercept);
+        console.log('angle', angle);
+        console.log('angleRad', angleRad*180/Math.PI);
+
+        svg.selectAll("line")
+           .remove();
+
+        svg.append("line")
+           .attr("x1", 0)
+           .attr("y1", intercept)
+           .attr("x2", width)
+           .attr("y2", intercept + width*slope)
+           .attr("stroke", "black")
+           .attr("stroke-width", 2);
+
+        svg.selectAll("rect")
+           .remove();
+
+        // Color the halfplanes
+        var delta = .1
+
+        // Check if plane is entirely one color
+        if (Math.abs(intercept) > 10000) {
+          svg.append("rect")
+                   .attr("x", 0)
+                   .attr("y", 0)
+                   .attr("height", height)
+                   .attr("width", width)
+                   .style("fill", function() {
+                                    var point = [0, intercept + delta];
+                                    console.log('point', point)
+                                    var dotProd = a[0]*point[0] + a[1]*point[1] - beta;
+                                    if (dotProd > 0) {
+                                      return "red";
+                                    }
+                                    else {
+                                      return "green";
+                                    }
+                                  })
+                   .style("opacity", 0.3);
+        }
+
+        // Add halfplanes and margins
+        svg.append("rect")
+                   .attr("x", 0)
+                   .attr("y", intercept)
+                   .attr("height", 100000)
+                   .attr("width", 100000)
+                   .style("fill", function() {
+                                    var point = [0, intercept + delta];
+                                    console.log('point', point)
+                                    var dotProd = a[0]*point[0] + a[1]*point[1] - beta;
+                                    if (dotProd > 0) {
+                                      return "red";
+                                    }
+                                    else {
+                                      return "green";
+                                    }
+                                  })
+                   .style("opacity", 0.3)
+                   .attr("transform", "translate(" +(2*width)+ "," +(2*slope*width)+ ") rotate(" +angle+ "," +0+ "," +intercept+ ")" )
+        // Add margin
+        svg.append("rect")
+                   .attr("x", 0)
+                   .attr("y", intercept)
+                   .attr("height", 100000)
+                   .attr("width", 1/aNorm)
+                   .style("fill", function() {
+                                    var point = [0, intercept + delta];
+                                    var dotProd = a[0]*point[0] + a[1]*point[1] - beta;
+                                    if (dotProd > 0) {
+                                      return "red";
+                                    }
+                                    else {
+                                      return "green";
+                                    }
+                                  })
+                   .style("opacity", 0.3)
+                   .attr("stroke", "black")
+                   .attr("transform", "translate(" +(2*width)+ "," +(2*slope*width)+ ") rotate(" +angle+ "," +0+ "," +intercept+ ")" )
+
+        svg.append("rect")
+                   .attr("x", 0)
+                   .attr("y", intercept)
+                   .attr("height", 100000)
+                   .attr("width", 100000)
+                   .style("fill", function() {
+                                    var point = [0, intercept - delta];
+                                    console.log('point', point)
+                                    var dotProd = a[0]*point[0] + a[1]*point[1] - beta;
+                                    if (dotProd > 0) {
+                                      return "red";
+                                    }
+                                    else {
+                                      return "green";
+                                    }
+                                  })
+                   .style("opacity", 0.3)
+                   .attr("transform", "translate(" +(-width)+ "," +((-1)*slope*width)+ ") rotate(" +(angle + 180)+ "," +0+ "," +intercept+ ")" )
+
+        svg.append("rect")
+                   .attr("x", 0)
+                   .attr("y", intercept)
+                   .attr("height", 100000)
+                   .attr("width", 1/aNorm)
+                   .style("fill", function() {
+                                    var point = [0, intercept - delta];
+                                    var dotProd = a[0]*point[0] + a[1]*point[1] - beta;
+                                    if (dotProd > 0) {
+                                      return "red";
+                                    }
+                                    else {
+                                      return "green";
+                                    }
+                                  })
+                   .style("opacity", 0.3)
+                   .attr("stroke", "black")
+                   .attr("transform", "translate(" +(-width)+ "," +((-1)*slope*width)+ ") rotate(" +(angle + 180)+ "," +0+ "," +intercept+ ")" )
+
+       svg.selectAll("circle")
+          .attr("class", function (d) {
+              var x = d.x;
+              var y = d.y;
+              var t = d.type;
+              var classstr = "";
+              var curr_classstr = d3.select(this).attr("class");
+              var out = a[0]*x + a[1]*y - beta;
+              var i;
+              var class_arr = curr_classstr.split(" ");
+              if (out < 0 && t === 1 ) {
+                 classstr = "misclassified";
+              } else if (out > 0 && t === -1) {
+                 classstr = "misclassified";
+              }
+
+
+              for (i = 0; i < class_arr.length; i++) {
+                 if (class_arr[i] === "misclassified") {
+                   class_arr.splice(i, 1);
+                 }
+              }
+
+              return class_arr.join(" ") + " " + classstr;
+           });
+
+      }
+   }
+}
+
+</script>
