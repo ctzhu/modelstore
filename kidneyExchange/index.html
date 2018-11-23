@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<script>
+  MathJax.Hub.Config({
+                      tex2jax: {inlineMath: [['$', '$'], ['\\(','\\)']]},
+                      TeX: { equationNumbers: {autoNumber: "AMS"} },
+                      "HTML-CSS": { showMathMenu: false,
+                                    scale: 90 }
+                     });
+</script>
+<link rel="stylesheet" href="http://examples.gurobi.com/base.css">
+<style>
+a:hover.screenshot {
+  opacity: .7;
+}
+
+.tabinput {
+ width: 40px;
+}
+
+rect.add:hover {
+  opacity: .5;
+}
+
+table, th, td {
+    border: 1px solid black;
+    padding: 5px;
+}
+
+.noselect {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    cursor: default;
+}
+
+.node {
+  stroke-width: 2px;
+  stroke: black;
+}
+
+.link {
+  stroke-width: 5px;
+  fill: none;
+}
+
+</style>
+<body>
+  <ul id="nav">
+    <li class="current"><a href="#intro">Intro</a></li>
+    <li><a href="#problem">Problem</a></li>
+    <li><a href="#model">Model</a></li>
+    <li><a href="#implementation">Implementation</a></li>
+    <li><a href="#demo">Live Demo</a></li>
+    <li><a href="#try">Try Gurobi for Free</a></li>
+  </ul>
+  <div id="example_container">
+    <div class="example_section" id="intro">
+      <h1>Kidney Exchange</h1>
+        <subtitle>with integer programming and Gurobi</subtitle>
+    </div>
+
+    <p>
+      In this example we'll solve the Kidney Exchange Problem: how to
+      exchange kidneys between donors and patients in need of a
+      transplant.
+    </p>
+
+    <p>
+      We'll construct a mathematical model of the problem,
+      implement this model in Gurobi's Python interface, and compute and
+      visualize an optimal solution.
+    </p>
+
+    <h3>
+      Click the screenshot to skip directly to the Live Demo!
+    </h3>
+    <p>
+      <a href="#demo" class="screenshot">
+        <img src="screenshot.png" alt="Live Demo">
+      </a>
+    </p>
+
+    <div class="example_section" id="problem">
+      <h2><a href="#problem" name="problem">Problem Description</a></h2>
+
+      <p>According to
+        the <a href="http://www.nytimes.com/2015/05/03/magazine/the-great-american-kidney-swap.html">
+        New York Times</a>, in the United States there are more than
+        100,000 people, on the transplant list, waiting for a kidney.
+        Patients typically wait four to five years before a
+        transplant. In 2014, more than 4,000 people
+        died while waiting on the transplant list.
+      </p>
+
+      <p>New software and algorithms, many of them based on integer
+        programming, have recently been developed to better match
+        patients with donors. In this example, we will see how
+        an integer programming model based on exchanging kidneys
+        can help more transplants happen.
+      </p>
+
+      <p>
+         Often a patient in need of a transplant has a friend or
+        family member who is willing to donate their kidney. However,
+        because of differences in blood types and proteins in the
+        blood, the potential donor may be incompatiable with the
+        patient. Thus a transplant cannot be made, or if the
+        transplant were to occur, the recipient would have a high chance
+        of rejecting the donor's kidney.
+      </p>
+
+      <p>In this example we consider four types of patients (donors
+        and recipients) categorized by blood type and proteins. Each
+        patient type is represented by a color: blue, orange, green,
+        or red. The different compatibility factors between the
+        different types are shown in the table below:
+
+        <table style="width: 800px">
+        <thead>
+        <tr>
+        <td></td>
+        <td>
+        <svg width="40" height="25" style="background-color:#1f77b4;">
+                <text x="10" y="20" style="fill: white">R</text>
+        </svg>
+        </td>
+        <td>
+        <svg width="40" height="25" style="background-color:#ff7f0e;">
+          <text x="10" y="20" style="fill: white">R</text>
+        </svg>
+        </td>
+        <td>
+        <svg width="40" height="25" style="background-color:#2ca02c;">
+          <text x="10" y="20" style="fill: white">R</text>
+        </svg>
+        </td>
+        <td>
+        <svg width="40" height="25" style="background-color:#d62728;">
+          <text x="10" y="20" style="fill: white">R</text>
+        </svg>
+        </td>
+        </tr>
+        <tbody>
+        <tr><td>
+            <svg width="40" height="25" style="background-color:#1f77b4;">
+              <text x="10" y="20" style="fill: white">D</text>
+            </svg>
+            </td>
+            <td>100%</td>
+            <td>50%</td>
+            <td>20%</td>
+            <td>0%</td>
+        </tr>
+        <tr><td>
+            <svg width="40" height="25" style="background-color:#ff7f0e;">
+              <text x="10" y="20" style="fill: white">D</text>
+            </svg>
+            </td>
+            <td>50%</td>
+            <td>100%</td>
+            <td>0%</td>
+            <td>70%</td>
+        </tr>
+        <tr><td>
+            <svg width="40" height="25" style="background-color:#2ca02c;">
+              <text x="10" y="20" style="fill: white">D</text>
+            </svg>
+            </td>
+            <td>20%</td>
+            <td>0%</td>
+            <td>100%</td>
+            <td>60%</td>
+        </tr>
+        <tr><td>
+            <svg width="40" height="25" style="background-color:#d62728;">
+              <text x="10" y="20" style="fill: white">D</text>
+            </svg>
+            </td>
+            <td>0%</td>
+            <td>70%</td>
+            <td>60%</td>
+            <td>100%</td>
+        </tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        For example, an orange donor cannot give a kidney to a green recipient,
+        and a blue donor and a green recipient are only 20% compatiable.
+      </p>
+
+      <p>The key to conducting a transplant in the presence of these
+        incompatibilites, is doing
+        a <a href="http://www.cs.cmu.edu/~sandholm/kidneyExchange.EC07.withGrantInfo.pdf">pair-exchange</a>,
+        or a kidney swap.
+      </p>
+
+      <p>
+        Suppose there are four patients: two potential recipients and two potential donors.
+        Recipient 1 is orange and her potential donor is green, while recipient
+        2 is green and his potential donor is blue. From the table above,
+        we see that recipient 1 and donor 1 are incompatibale, and recipient
+        2 and donor 2 are only 20% compatible. However, if recipient 1 were
+        to receive a kidney from donor 2, they would be 50% compatiable. And
+        if recipient 2 were to receive a kidney from donor 1 they would be 100%
+        compatiable.
+        </p>
+
+      <div id="diagram">
+      </div>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+      <script>
+        var diagram = d3.select("#diagram")
+                       .append("svg")
+                        .attr("width", 400)
+                        .attr("height", 150);
+
+        diagram.append("rect")
+                .attr("width", 100)
+                .attr("height", 25)
+                .attr("x", 10)
+                .attr("y", 0)
+                .attr("fill", "#ff7f0e");
+        diagram.append("text")
+               .attr("x", 20)
+               .attr("y", 20)
+               .attr("fill", "white")
+               .text("Recipient 1");
+
+        diagram.append("rect")
+                .attr("width", 100)
+                .attr("height", 25)
+                .attr("x", 200)
+                .attr("y", 0)
+                .attr("fill", "#2ca02c");
+        diagram.append("text")
+               .attr("x", 210)
+               .attr("y", 20)
+               .attr("fill", "white")
+               .text("Recipient 2");
+
+        diagram.append("rect")
+                .attr("width", 100)
+                .attr("height", 25)
+                .attr("x", 10)
+                .attr("y", 100)
+                .attr("fill", "#2ca02c");
+        diagram.append("text")
+               .attr("x", 20)
+               .attr("y", 120)
+               .attr("fill", "white")
+               .text("Donor 1");
+
+        diagram.append("rect")
+                .attr("width", 100)
+                .attr("height", 25)
+                .attr("x", 200)
+                .attr("y", 100)
+                .attr("fill", "#1f77b4");
+        diagram.append("text")
+               .attr("x", 220)
+               .attr("y", 120)
+               .attr("fill", "white")
+               .text("Donor 2");
+
+        diagram.append("line")
+               .attr("x1", 60)
+               .attr("y1", 25)
+               .attr("x2", 60)
+               .attr("y2", 100)
+               .attr("stroke", "black");
+
+        diagram.append("line")
+               .attr("x1", 250)
+               .attr("y1", 25)
+               .attr("x2", 250)
+               .attr("y2", 100)
+               .attr("stroke", "black");
+
+        diagram.append("text")
+           .attr("x", 70)
+           .attr("y", 70)
+           .attr("fill", "black")
+           .text("0% match");
+
+
+        diagram.append("text")
+           .attr("x", 260)
+           .attr("y", 70)
+           .attr("fill", "black")
+           .text("20% match");
+
+        diagram.append("line")
+          .attr("x1", 360)
+          .attr("y1", 0)
+          .attr("x2", 360)
+          .attr("y2", 130)
+          .attr("stroke", "black")
+          .attr("stroke-dasharray", "10, 10");
+
+
+        var diagram2 = d3.select("#diagram")
+                       .append("svg")
+                        .attr("width", 400)
+                        .attr("height", 150);
+
+        diagram2.append("rect")
+                .attr("width", 100)
+                .attr("height", 25)
+                .attr("x", 10)
+                .attr("y", 0)
+                .attr("fill", "#ff7f0e");
+        diagram2.append("text")
+               .attr("x", 20)
+               .attr("y", 20)
+               .attr("fill", "white")
+               .text("Recipient 1");
+
+        diagram2.append("rect")
+                .attr("width", 100)
+                .attr("height", 25)
+                .attr("x", 200)
+                .attr("y", 0)
+                .attr("fill", "#2ca02c");
+        diagram2.append("text")
+               .attr("x", 210)
+               .attr("y", 20)
+               .attr("fill", "white")
+               .text("Recipient 2");
+
+        diagram2.append("rect")
+                .attr("width", 100)
+                .attr("height", 25)
+                .attr("x", 10)
+                .attr("y", 100)
+                .attr("fill", "#2ca02c");
+        diagram2.append("text")
+               .attr("x", 20)
+               .attr("y", 120)
+               .attr("fill", "white")
+               .text("Donor 1");
+
+        diagram2.append("rect")
+                .attr("width", 100)
+                .attr("height", 25)
+                .attr("x", 200)
+                .attr("y", 100)
+                .attr("fill", "#1f77b4");
+        diagram2.append("text")
+               .attr("x", 220)
+               .attr("y", 120)
+               .attr("fill", "white")
+               .text("Donor 2");
+
+        diagram2.append("line")
+               .attr("x1", 60)
+               .attr("y1", 25)
+               .attr("x2", 250)
+               .attr("y2", 100)
+               .attr("stroke", "black");
+
+        diagram2.append("line")
+               .attr("x1", 250)
+               .attr("y1", 25)
+               .attr("x2", 60)
+               .attr("y2", 100)
+               .attr("stroke", "black");
+
+        diagram2.append("text")
+           .attr("x", 0)
+           .attr("y", 80)
+           .attr("fill", "black")
+           .text("100% match");
+
+
+        diagram2.append("text")
+           .attr("x", 240)
+           .attr("y", 80)
+           .attr("fill", "black")
+           .text("50% match");
+
+      </script>
+
+       <!-- Imagine the kidney exchange problem on a national scale. There are currently -->
+       <!--  <a href="http://www.unos.org/">70,000 patients</a> waiting on kidneys -->
+       <!--  in the US. -->
+
+      <p>According to
+        the <a href="http://www.nytimes.com/2015/05/03/magazine/the-great-american-kidney-swap.html">New
+        York Times</a>, last year in the United States more than 500
+        kidneys were transplanted through these paired exchange
+        programs.
+      </p>
+
+      <p>
+        Furthermore, kidney exchanges need not be between two
+        patient-donor pairs. We could form longer cycles. For example,
+        with donor 1 giving to patient 2, donor 2 giving to patient 3,
+        and donor 3 giving to patient 1. Longer cycles with even more
+        patients are also possible.
+        </p>
+
+      <p>
+        However, there are issues with longer cycles. In a longer
+        cycle more people are affected if an exchange fails. In
+        addition, if all transplants are done simultaneously (to avoid
+        donors backing out once their partner has received a kidney),
+        more medical staff and operating rooms are required with
+        longer cycles.  Therefore, in this example, we restrict the
+        number of donor/recipient pairs in a cycle to be at most 3.
+      </p>
+
+
+      <p>The kidney exchange problem is then: given a set of donor/recipient
+        pairs with differing compatibility, find a set of cycles, of
+        length at most 3, that maximizes the number of patients receiving
+        a compatiable kidney.
+      </p>
+
+    </div>
+    <div class="example_section" id="model">
+      <h2><a href="#model" name="model">Mathematical Model</a></h2>
+
+      <p>
+        Kidney exchange is an example of the more general
+        <i>barter exchange market problem</i>. In this problem, agents
+        seek to swap their items, creating cycles of agents where each
+        agent receives the item from the previous agent in the
+        cycle. The goal is to find a set of cycles which maximize the
+        utility over all agents. In contrast to usual exchanges, in a
+        barter exchange, items are swapped directly without the use of
+        money.
+      </p>
+
+      <p>
+        There
+        are <a href="http://www.cs.cmu.edu/~sandholm/kidneyExchange.EC07.withGrantInfo.pdf">
+        several ways</a> to formulate the kidney exchange problem as
+        an integer program. In this example, we will use a <em>cycle
+        cover</em> formulation.
+      </p>
+
+      <p> Let $G(V, E)$ be a directed graph with weighted edges. Each
+        vertex in $V$ corresponds to a donor/recipient pair. The
+        directed weighted edges represent the compatiblity factors
+        between donors and recipients.  For example, if recipient 1
+        and donor 2 are perfectly compatible, we give the edge (1,2) a
+        weight of 1. If they are less compatible, and the risk of
+        failure of a transplant is higher, we would give the edge a
+        smaller weight.
+      </p>
+
+      <p>
+        Let $C$ be the set of cycles in the graph of length at most 3. Let $w_c$
+        denote the weight of cycle $c$, which is equal to the sum of all edge weights in
+        the cycle. Our goal is to find a cycle cover of the graph with maximum
+        weight. Therefore, we define a binary variable $x_c$ for each cycle such
+        that
+        \[
+        x_c = \left\{\begin{array}{ll}
+               1 & \text{if cycle $c$ is in the cover}\\
+               0 & \mathrm{otherwise.}
+              \end{array}\right.
+        \]
+      </p>
+
+      <p>
+        The objective we seek to maximize is the total weight of the cover:
+        \[
+        \text{total cover weight} = \sum_{c \in C} w_c x_c.
+        \]
+      </p>
+
+      <p>
+        Now since a recipient needs to receive one kidney and a donor can
+        give at most one kidney, each vertex of the graph can be in at most one
+        cycle. To impose this constraint, we first find all the cycles in which
+        a given vertex $v$ is included. The sum of the binary variables
+        corresponding to these cycles must then at most be one. So we have
+        the following set of constraints (one for each vertex $v$):
+        \[
+        \sum_{c : v \in c} x_c \leq 1 \quad \forall v \in V.
+        \]
+      </p>
+
+      <p>
+        So finally our optimization model becomes
+        \[
+        \begin{array}{ll}
+        \text{maximize}   & {\displaystyle \sum_{c \in C} w_c x_c} \\
+        \text{subject to} & {\displaystyle \sum_{c : v \in c} x_c} \leq 1, \quad \forall v \in V, \\
+                          & x_c \in \{ 0, 1 \}, \quad \forall c \in C.
+        \end{array}
+        \]
+      </p>
+
+    </div>
+    <div class="example_section" id="implementation">
+      <h2><a href="#implementation" name="implementation">Implementation</a></h2>
+      <p>Below is the full implementation of the model (and the associated data) in
+        Gurobi's Python interface:
+      </p>
+      <examplecode>
+from gurobipy import *
+
+vertices  = range(5)
+edges = { (0,1) : 1, (1,0) : 1, (0,2) : 1, (2,0) : 1,
+          (0,4) : 1, (4,0) : 1, (1,4) : 1, (4,1) : 1,
+          (1,3) : 1, (3,1) : 1, (2,3) : 1, (3,2) : 1,
+          (3,4) : 1, (4,3) : 1 }
+
+def twoCycle(vertices, edges):
+    '''
+    Returns a dictionary of 2 cycles. Keys: (u,v), Value: weight of cycle
+    Note that u &lt; v to not double count cycles.
+    '''
+    twoCycles = {}
+    for edge in edges:
+        u = edge[0]
+        v = edge[1]
+        if (u &lt; v and (v,u) in edges):
+            twoCycles[(u,v)] = edges[(u,v)] + edges[(v,u)]
+    return twoCycles
+
+def threeCycle(vertices, edges):
+    '''
+    Returns a dictionary of 3 cycles. Keys: (u,w,v), Value: weight of cycle
+    Note that w is always the lowest numbered vertex to not double
+    (or triple) count cycles.
+    '''
+    threeCycles = {}
+    for edge in edges:
+        u = edge[0]
+        v = edge[1]
+        for w in vertices:
+            if (w >= u or w >= v ):
+                break
+            if ( (u,w) in edges and (w,v) in edges ):
+                threeCycles[(u,w,v)] = edges[(u,v)] + edges[(u,w)] + edges[(w,v)]
+    return threeCycles
+
+twoCycles = twoCycle(vertices, edges)
+threeCycles = threeCycle(vertices, edges)
+
+m = Model()
+
+c = {}
+
+for cycle in twoCycles:
+    c[cycle] = m.addVar(vtype=GRB.BINARY, name="c_%s" % str(cycle))
+
+for cycle in threeCycles:
+    c[cycle] = m.addVar(vtype=GRB.BINARY, name="c_%s" % str(cycle))
+
+m.update()
+
+for v in vertices:
+  constraint = []
+  for cycle in c:
+      if (v in cycle):
+          constraint.append(c[cycle])
+  if constraint:
+      m.addConstr( quicksum( constraint[i] for i in range(len(constraint)) ) <= 1 , name="v%d" % v)
+
+m.setObjective( quicksum( c[cycle] * twoCycles[cycle] for cycle in twoCycles ) +
+                quicksum( c[cycle] * threeCycles[cycle] for cycle in threeCycles ),
+                GRB.MAXIMIZE )
+
+m.optimize()
+      </examplecode>
+    </div>
+    <div class="example_section" id="demo">
+      <h2><a href="#demo" name="demo">Live Demo</a></h2>
+      <p>
+        Below is a visualization of our Kidney Exchange example.
+      </p>
+
+      <p>
+        You can add different types of donor/recipient pairs by changing
+        the numbers in the table below.
+      </p>
+
+      <p>
+        Donor/recipient pairs are represented by nodes
+        <svg height="40" width="40">
+          <defs>
+            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="50%" style="stop-color:#1f77b4;stop-opacity:1" />
+              <stop offset="50%" style="stop-color:#ff7f0e;stop-opacity:1" />
+            </linearGradient>
+          </defs>
+          <circle cx="20" cy="20" r="18" stroke="black" stroke-width="2" fill="url(#grad1)" />
+          <text x="5" y="25" style="fill: white">D</text>
+          <text x="25" y="25" style="fill: white">R</text>
+        </svg>
+
+         where the color of the <em>left</em> side of the circle represents the type of the <em>donor</em>
+         and the color of the <em>right</em> side represents the type of the <em>recipient</em>.
+      </p>
+
+      <p>
+        To find the optimal kidney exchange using Gurobi, click "Compute".
+        The colors of the edges represent the type of kidney donated.
+      </p>
+
+      <p>
+        You can also drag the nodes around to make the visualization clearer.
+      </p>
+
+      <table style="width: 800px">
+        <thead>
+          <tr>
+            <td></td>
+            <td>
+              <svg width="40" height="25" style="background-color:#1f77b4;">
+                <text x="10" y="20" style="fill: white">R</text>
+              </svg>
+            </td>
+            <td>
+              <svg width="40" height="25" style="background-color:#ff7f0e;">
+                <text x="10" y="20" style="fill: white">R</text>
+              </svg>
+            </td>
+        <td>
+          <svg width="40" height="25" style="background-color:#2ca02c;">
+            <text x="10" y="20" style="fill: white">R</text>
+          </svg>
+        </td>
+        <td>
+          <svg width="40" height="25" style="background-color:#d62728;">
+            <text x="10" y="20" style="fill: white">R</text>
+          </svg>
+        </td>
+        </tr>
+          <tbody>
+            <tr>
+              <td>
+                <svg width="40" height="25" style="background-color:#1f77b4;">
+                  <text x="10" y="20" style="fill: white">D</text>
+                </svg>
+              </td>
+              <td></td>
+              <td><input type="number" value="0" id="i12" class="tabinput"></td>
+              <td><input type="number" value="1" id="i13" class="tabinput"></td>
+              <td><input type="number" value="1" id="i14" class="tabinput"></td>
+            </tr>
+            <tr>
+              <td>
+                <svg width="40" height="25" style="background-color:#ff7f0e;">
+                  <text x="10" y="20" style="fill: white">D</text>
+                </svg>
+              </td>
+              <td><input type="number" value="2" id="i21" class="tabinput"></td>
+              <td></td>
+              <td><input type="number" value="1" id="i23" class="tabinput"></td>
+              <td><input type="number" value="1" id="i24" class="tabinput"></td>
+            </tr>
+            <tr>
+              <td>
+                <svg width="40" height="25" style="background-color:#2ca02c;">
+                  <text x="10" y="20" style="fill: white">D</text>
+                </svg>
+              </td>
+              <td><input type="number" value="1" id="i31" class="tabinput"></td>
+              <td><input type="number" value="1" id="i32" class="tabinput"></td>
+              <td></td>
+              <td><input type="number" value="2" id="i34" class="tabinput"></td>
+        </tr>
+        <tr>
+          <td>
+            <svg width="40" height="25" style="background-color:#d62728;">
+              <text x="10" y="20" style="fill: white">D</text>
+            </svg>
+          </td>
+          <td><input type="number" value="1" id="i41" class="tabinput"></td>
+          <td><input type="number" value="1" id="i42" class="tabinput"></td>
+          <td><input type="number" value="0" id="i43" class="tabinput"></td>
+          <td></td>
+        </tr>
+          </tbody>
+      </table>
+
+      <div id="demoarea">
+      </div>
+      <button class="pure-button" onclick="compute()">Compute</button>
+      <p>
+        <button class="pure-button" onclick="toggle_div()">Gurobi Log</button>
+      </p>
+
+
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+      <script>
+        function toggle_div() {
+          var logfile = d3.select('#logfile');
+          if (logfile.style("display") === "none") {
+            logfile.style("display", "block");
+          } else {
+            logfile.style("display", "none");
+          }
+        }
+      </script>
+
+      <examplecode id=logfile>
+      </examplecode>
+    </div>
+
+    <div class="example_section" id="try">
+      <h2><a href="#try" name="try">Try Gurobi for Free</a></h2>
+      <p> We hope this example has taught you a bit about kidney
+        exchange and using Gurobi. We encourage you
+        to try the example out for yourself with Gurobi.  To enable
+        this, we provide easy access to a full-featured evaluation
+        version of Gurobi.
+      </p>
+      <div class="col_5 column">
+        <a href="http://www.gurobi.com/downloads/evaluation-request">
+          <button class="red stack-button">
+            <i class="fa fa-lg fa-line-chart"></i>
+            Commercial Users: Free Evaluation Version
+          </button>
+        </a>
+      </div>
+      <div class="col_5 column">
+        <a href="http://www.gurobi.com/downloads/download-center">
+          <button class="red stack-button">
+            <i class="fa fa-lg fa-line-chart"></i>
+            Academic Users: Free Academic Version
+          </button>
+        </a>
+      </div>
+      <p>
+        We are always happy to discuss your needs and answer your questions.
+        Just <a href="http://www.gurobi.com/company/contact-us">contact us</a>
+        at your convenience.
+      </p>
+    </div>
+
+    <div style="min-height:100px"></div>
+<!--[if gt IE 8]><!--><script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script><!--<![endif]-->
+<script src="jquery.nav.js"></script>
+<script>
+  $(document).ready(function() {
+  console.log('calling onePageNav');
+  $('#nav').onePageNav({scrollOffset:120});
+  });
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/spin.js/1.2.7/spin.min.js"></script>
+<script>
+
+// Hide Log File initially
+d3.select('#logfile').style("display", "none");
+
+// Needed for loading screen
+var spinner;
+
+//Width, height button width, menu size
+var width = 800;
+var height = 650;
+var colors = d3.scale.category10();
+
+var svg = d3.select("#demoarea")
+              .append("svg")
+              .attr("width", width)
+              .attr("height", height);
+
+var colorGradients = [];
+
+// Each row is a donor, each column is a recipient
+for (var i = 0; i < 4; i++) {
+  var row = [];
+  for (var j = 0; j < 4; j++) {
+    if (i !== j) {
+      var id = "grad" + String(i) + String(j);
+      row.push(svg.append("defs").append("linearGradient").attr("id", id)
+              .attr("x1", "0%").attr("x2", "100%").attr("y1", "0%").attr("y2", "0%"));
+      row[row.length-1].append("stop").attr("offset", "50%").style("stop-color", colors(i));
+      row[row.length-1].append("stop").attr("offset", "50%").style("stop-color", colors(j));
+    }
+  }
+  colorGradients.push(row);
+}
+
+var nodeNumber = 0;
+
+/*******************************
+ *
+ *      CREATING G OBJECTS
+ *
+ *******************************/
+// G object for points
+var backgroundG = svg.append("g");
+
+// G objects for force layout
+var linksG = svg.append("g");
+var nodesG = svg.append("g");
+
+// G object for spinner
+var spinnerG = svg.append("g");
+
+/*******************************
+ *
+ *     CREATE FORCE LAYOUT
+ *
+ *******************************/
+
+// Set up force layout
+var force = d3.layout.force()
+    .charge(-200)
+    .linkDistance(80)
+    .size([width, height]);
+
+var nodes = force.nodes();
+var links = force.links();
+
+
+var matrix = (function () {
+   /* row = matrix[i] */
+   /* row[j] = element i j */
+   var mat = [];
+   for (var i = 0; i < 4; i++) {
+      var row = [];
+      for (var j = 0; j < 4; j++) {
+        if (i !== j) {
+           var myid = "#i" + (i+1) + (j+1);
+           var sel = d3.select(myid);
+           console.log(myid, sel);
+           console.log(myid, sel.attr("value"));
+           var elem = +sel.attr("value");
+           row.push(elem);
+           for (var k = 0; k < elem; k++) {
+               addNode(i, j);
+           }
+        } else {
+           row.push(0);
+        }
+      }
+      mat.push(row);
+   }
+  return mat;
+}());
+
+d3.selectAll(".tabinput")
+    .attr("min", 0)
+    .attr("max", 9)
+    .on("input", function () {
+      console.log(this.id, this.value);
+      if (+this.value > 9) {
+        this.value = 9;
+      }
+      if (+this.value !== +this.value) {
+        this.value = 0;
+      }
+      var idtxt = this.id;
+      var i = +idtxt[1]-1;
+      var j = +idtxt[2]-1;
+      var oldval = matrix[i][j];
+      matrix[i][j] = +this.value;
+      var delta;
+      if (oldval < matrix[i][j]) {
+         for (delta = oldval; delta < matrix[i][j]; delta++) {
+             addNode(i, j);
+         }
+      } else  if (oldval > matrix[i][j]) {
+         for (delta = oldval; delta > matrix[i][j]; delta--) {
+            removeNode(i, j);
+         }
+      }
+    })
+
+
+
+// Functions needed for force layout interaction
+function addNode(donor, acceptor) {
+  console.log('nodeNumber',nodeNumber);
+  nodeNumber++;
+  nodes.push({"id": nodeNumber,
+              "donor": donor,
+              "acceptor": acceptor });
+  removeAllLinks();
+}
+
+function removeNode(donor, acceptor) {
+  var idx = -1;
+  for (var i = 0; i < nodes.length; i++) {
+    console.log('donor', nodes[i].donor, donor);
+    if (nodes[i].donor === donor && nodes[i].acceptor === acceptor) {
+      console.log('node found', i);
+      idx = i;
+      break;
+    }
+  }
+  if (idx < 0) {
+    console.log('no node');
+    return;
+  } else {
+    nodes.splice(idx, 1);
+    start();
+  }
+  removeAllLinks();
+}
+
+function addLink(source, target, value) {
+  // Better to initialize source and target to objects explicitly
+  // If we add links with source and target as integer indexs
+  // before to call to force.start(), these are replaced by objects
+  // automatically by d3. But if we add links when the simulation
+  // is already running, source and target need to be objects
+
+  sourceNode = nodes[source];
+  targetNode = nodes[target];
+
+  links.push({"source":sourceNode,"target":targetNode,"value":value});
+  start();
+}
+
+function removeAllLinks() {
+  links.splice(0,links.length);
+  start();
+}
+
+function start() {
+
+  var link = linksG.selectAll(".link")
+                .data(links);
+
+  link.enter().append("path")
+      .attr("d", function(d) {
+            var dx = d.target.x - d.source.x,
+                dy = d.target.y - d.source.y,
+                dr = Math.sqrt(dx * dx + dy * dy);
+            return "M" +
+                d.source.x + "," +
+                d.source.y + "A" +
+                dr + "," + dr + " 0 0,1 " +
+                d.target.x + "," +
+                d.target.y;
+      })
+      .attr("class", "link")
+      .style("stroke", function(d) { var src = d.source;
+                                     var donortype = src.donor;
+                                     return colors(donortype);} );
+
+  link.exit().remove();
+
+  var groups = nodesG.selectAll(".compositenode")
+                     .data(nodes, function(d) { return d.id;})
+
+  var groupEnter = groups.enter().append("g")
+            .attr("class", "compositenode")
+            .call(force.drag);
+
+  groupEnter.append("circle")
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .attr("r", 20)
+        .attr("stroke", "black")
+        .attr("stroke-width", 3)
+        .style("fill", function(d) { return colorgradient(d.donor, d.acceptor);})
+
+  groupEnter.append("text")
+        .attr("x", -14)
+        .attr("y", 7)
+        .text("D")
+        .style("fill", "white");
+   //     .style("fill", function(d) { return colors(d.donor); });
+
+  groupEnter.append("text")
+        .attr("x", 2)
+        .attr("y", 7)
+        .text("R")
+        .style("fill", "white");
+ //       .style("fill", function(d) { return colors(d.acceptor); });
+
+  groups.exit().remove();
+
+  force.on("tick", function() {
+        link.attr("d", function(d) {
+        var dx = d.target.x - d.source.x,
+            dy = d.target.y - d.source.y,
+            dr = Math.sqrt(dx * dx + dy * dy);
+        return "M" +
+            d.source.x + "," +
+            d.source.y + "A" +
+            dr + "," + dr + " 0 0,1 " +
+            d.target.x + "," +
+            d.target.y;
+        });
+
+        groups.attr("transform", function(d, i) {
+            var x = d.x;
+            var y = d.y;
+            return "translate(" + [x,y] + ")";
+        });
+
+  })
+
+  force.start();
+}
+
+
+function colorgradient(i, j) {
+  return "url(#grad" + i + j + ")"; // E.g. if "type0" return colors(0)
+}
+
+
+/*******************************
+ *
+ *CREATE BACKGROUND AND BUTTONS
+ *
+ *******************************/
+
+backgroundG.append("rect")
+           .attr("x",0)
+           .attr("y",0)
+           .attr("width", width)
+           .attr("height", height)
+           .attr("fill", "white")
+           .attr("stroke", "black");
+
+/*******************************
+ *
+ *        COMPATIBILITY DATA
+ *
+ *******************************/
+
+// Compatibility matrix between different donors and acceptors
+var type12 = .5, type13 = .2, type14 = 0;
+var type23 = 0, type24 = .7;
+var type34 = .6;
+var compatibility = [[1, type12, type13, type14],
+                     [type12, 1, type23, type24],
+                     [type13, type23, 1, type34],
+                     [type14, type24, type34, 1]];
+
+
+/*******************************
+ *
+ *        OPTIMIZATION
+ *
+ *******************************/
+
+function compute() {
+  if (force.nodes().length < 2) {
+    alert("Not enough donor/recipient pairs. Add more nodes!");
+    return;
+  }
+  // Show loading screen
+  spinnerG.append("rect")
+          .attr("x", 0).attr("y", 0)
+          .attr("width", width).attr("height", height)
+          .attr("fill", "white")
+          .attr("opacity", .5);
+  spinnerG.append("text")
+          .attr("x", width/2)
+          .attr("y", .4*height)
+          .attr("font-size", 25)
+          .attr("font-family", "Helvetica Neue")
+          .attr("font-weight", 400)
+          .attr("text-anchor", "middle")
+          .text("Computing...");
+  var target = document.getElementById('demoarea');
+  spinner = new Spinner({left: '375%'}).spin(target);
+
+  var vertices = [];
+  var edges = { 1 : [], 0.5 : [], 0.2 : [],
+                0.7 : [], 0.6 : []};
+
+  var nonzeros = 0;
+
+  var numNodes = force.nodes().length;
+  var nodes = force.nodes();
+
+  for (var i = 0; i < numNodes; i++) { // Iterate over donors
+    vertices.push(i);
+    for (var j = 0; j < numNodes; j++) { // Iterate over acceptors
+      if (i !== j) {
+        var node1 = nodes[i].donor;
+        var node2 = nodes[j].acceptor;
+        node1 = parseInt(node1);
+        node2 = parseInt(node2);
+        var edgeweight = compatibility[node1][node2];
+        if (edgeweight !== 0) {
+          edges[edgeweight].push([i,j]);
+          nonzeros = 1;
+        }
+      }
+    }
+  }
+  console.log('vertices', vertices);
+  console.log('edges', edges);
+
+  d3.json('kidneyexchange.py')
+    .header('Content-Type', 'application/json')
+    .post(JSON.stringify({'nodes': vertices,
+                          'edges': edges}), serverResponse);
+}
+
+function serverResponse(error, data) {
+   console.log('serverResponse');
+   console.log('data', data);
+
+   // Remove loading screen
+   spinnerG.selectAll("rect").remove("rect");
+   spinnerG.selectAll("text").remove("text");
+   spinner.stop();
+
+   if (!error) {
+      if ('solution' in data) {
+
+        var solutionTemp = data['solution'];
+        console.log('solution', solutionTemp)
+        if (solutionTemp[0] === "error") {
+          alert("10 second solve time limit exceeded. Reduce the number of patients.");
+          return;
+        }
+        var solution = solutionTemp[0];
+        var logMsg = solutionTemp[1]; // Log message to display
+
+        d3.select('#logfile').html(logMsg);
+
+        removeAllLinks();
+
+        if (solution.length < 1) {
+          alert("No compatible donor recipient pairs! Add more nodes.");
+          return;
+        }
+        // Add the edges of the cycles to graph.links
+        for (var i = 0; i < solution.length; i++) {
+          cycle = solution[i];
+          console.log(cycle);
+          for (var j = 0; j < cycle.length - 1; j++) {
+            addLink(cycle[j], cycle[j+1], 5);
+          }
+          addLink(cycle[cycle.length-1],cycle[0], 5);
+        }
+      }
+   }
+}
+
+</script>
